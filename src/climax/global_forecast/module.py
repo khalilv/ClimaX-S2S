@@ -17,7 +17,9 @@ from climax.utils.metrics import (
     lat_weighted_rmse,
 )
 from climax.utils.pos_embed import interpolate_pos_embed
+from torchinfo import summary
 
+#3) Global forecast module - abstraction for training/validation/testing steps. setup for the module including hyperparameters is included here
 
 class GlobalForecastModule(LightningModule):
     """Lightning module for global forecasting with the ClimaX model.
@@ -51,6 +53,7 @@ class GlobalForecastModule(LightningModule):
         super().__init__()
         self.save_hyperparameters(logger=False, ignore=["net"])
         self.net = net
+        print(summary(self.net))
         if len(pretrained_path) > 0:
             self.load_pretrained_weights(pretrained_path)
 
@@ -101,9 +104,11 @@ class GlobalForecastModule(LightningModule):
     def set_test_clim(self, clim):
         self.test_clim = clim
 
+    # can add multi-step training here - add k rollouts then average the loss before returning
     def training_step(self, batch: Any, batch_idx: int):
-        x, y, lead_times, variables, out_variables = batch
-
+        x, y, lead_times, variables, out_variables = batch #spread batch data 
+        
+        #run the model and calculate the loss based on lat_weighted_mse
         loss_dict, _ = self.net.forward(x, y, lead_times, variables, out_variables, [lat_weighted_mse], lat=self.lat)
         loss_dict = loss_dict[0]
         for var in loss_dict.keys():
@@ -116,7 +121,7 @@ class GlobalForecastModule(LightningModule):
             )
         loss = loss_dict["loss"]
 
-        return loss
+        return loss #return loss
 
     def validation_step(self, batch: Any, batch_idx: int):
         x, y, lead_times, variables, out_variables = batch
@@ -194,6 +199,7 @@ class GlobalForecastModule(LightningModule):
             )
         return loss_dict
 
+    #optimizer definition - will be used to optimize the network based
     def configure_optimizers(self):
         decay = []
         no_decay = []

@@ -19,6 +19,7 @@ from climax.pretrain.dataset import (
     ShuffleIterableDataset,
 )
 
+#2) Dataloader module - load the data into iterable objects for training/validation/testing
 
 class GlobalForecastDataModule(LightningDataModule):
     """DataModule for global forecast data.

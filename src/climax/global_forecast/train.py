@@ -7,6 +7,7 @@ from climax.global_forecast.datamodule import GlobalForecastDataModule
 from climax.global_forecast.module import GlobalForecastModule
 from pytorch_lightning.cli import LightningCLI
 
+# 1) entry point high-level class for training climaX. 
 
 def main():
     # Initialize Lightning with the model and data modules, and instruct it to parse the config yml

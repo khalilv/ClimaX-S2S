@@ -15,6 +15,7 @@ from climax.utils.pos_embed import (
 
 from .parallelpatchembed import ParallelVarPatchEmbed
 
+#4) Core architecture of ClimaX - should make an extension of this class to modify forward passes
 
 class ClimaX(nn.Module):
     """Implements the ClimaX model as described in the paper,
@@ -182,6 +183,7 @@ class ClimaX(nn.Module):
         imgs = x.reshape(shape=(x.shape[0], c, h * p, w * p))
         return imgs
 
+    #variable aggregation step 
     def aggregate_variables(self, x: torch.Tensor):
         """
         x: B, V, L, D
@@ -190,6 +192,7 @@ class ClimaX(nn.Module):
         x = torch.einsum("bvld->blvd", x)
         x = x.flatten(0, 1)  # BxL, V, D
 
+        #perform the aggregation using multi-headed attention
         var_query = self.var_query.repeat_interleave(x.shape[0], dim=0)
         x, _ = self.var_agg(var_query, x, x)  # BxL, D
         x = x.squeeze()
