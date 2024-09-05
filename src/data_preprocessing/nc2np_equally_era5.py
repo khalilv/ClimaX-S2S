@@ -22,16 +22,34 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year):
         normalize_std = {}
     climatology = {}
 
-    constants = xr.open_mfdataset(os.path.join(path, "constants.nc"), combine="by_coords", parallel=True)
+    constants = xr.open_mfdataset(os.path.join(save_dir, "static.nc"), combine="by_coords", parallel=True) 
     constant_fields = ["land_sea_mask", "orography", "lattitude"]
     constant_values = {}
     for f in constant_fields:
+        print(f)
+        # if partition == "train":
+        #     npy_arr = constants[NAME_TO_VAR[f]].to_numpy()
+        #     print(npy_arr.shape)
+        #     normalize_mean[f] = npy_arr.mean()
+        #     normalize_std[f] = npy_arr.std()
+        
+        #constants (721,1440)
+        #constant_values (8760,1,721,1440) 
+        #float32 each one is around ~30gb of memory
+
         constant_values[f] = np.expand_dims(constants[NAME_TO_VAR[f]].to_numpy(), axis=(0, 1)).repeat(
             HOURS_PER_YEAR, axis=0
         )
         if partition == "train":
             normalize_mean[f] = constant_values[f].mean(axis=(0, 2, 3))
             normalize_std[f] = constant_values[f].std(axis=(0, 2, 3))
+
+        #want to save slices of size t for n variables (t,n,721,1440)
+        #cant even get to 3. 
+
+        #option 1: sample data at 6hr time intervals (+ changes to training pipeline)
+        #option 2: regrid to coarser resolution
+        #option 3: spatially subset data to CA
 
     for year in tqdm(years):
         np_vars = {}
