@@ -96,11 +96,12 @@ def main(
     # Loop over input files
     for fn in input_fns:
         print(f'Regridding file: {fn}')
+        year = fn.split('_')[-1].split('.')[0]
         ds_in = xr.open_dataset(fn)
         ds_out = regrid(ds_in, ddeg_out, method, reuse_weights, cmip, rename)
         fn_out = (
             custom_fn or
-            '_'.join(fn.split('/')[-1][:-3].split('_')[:-1]) + '_' + str(ddeg_out) + 'deg.' + file_ending
+            '_'.join(fn.split('/')[-1][:-3].split('_')[:-1]) + '_' + str(ddeg_out) + 'deg' + str(year) + '.' + file_ending
         )
         print(f"Saving file: {output_dir + '/' + fn_out}")
         ds_out.to_netcdf(output_dir + '/' + fn_out)

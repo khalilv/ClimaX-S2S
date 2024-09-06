@@ -45,10 +45,8 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year):
             normalize_std[f] = constant_values[f].std(axis=(0, 2, 3))
 
         #want to save slices of size t for n variables (t,n,721,1440)
-        #cant even get to 3. 
-
-        #option 1: sample data at 6hr time intervals (+ changes to training pipeline)
-        #option 2: regrid to coarser resolution
+        #option 1: sample data at 6hr time intervals
+        #option 2: regrid to coarser resolution (SELECTED)
         #option 3: spatially subset data to CA
 
     for year in tqdm(years):
