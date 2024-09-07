@@ -22,7 +22,7 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year):
         normalize_std = {}
     climatology = {}
 
-    constants = xr.open_mfdataset(os.path.join(save_dir, "static.nc"), combine="by_coords", parallel=True) 
+    constants = xr.open_mfdataset(os.path.join(path, "static_1.40625.nc"), combine="by_coords", parallel=True) 
     constant_fields = ["land_sea_mask", "orography", "lattitude"]
     constant_values = {}
     for f in constant_fields:
