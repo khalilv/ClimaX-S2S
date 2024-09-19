@@ -209,7 +209,9 @@ class ClimaX(nn.Module):
         # tokenize each variable separately
         embeds = []
         var_ids = self.get_var_ids(variables, x.device)
-
+        
+        #D = embed dimension
+        #L = HW/(p^2) where P = patch size
         if self.parallel_patch_embed:
             x = self.token_embeds(x, var_ids)  # B, V, L, D
         else:

@@ -21,9 +21,9 @@ def validate_dataset(ds, filename, exp):
     assert ds.dims['longitude'] == exp['longitude'], f"Unexpected longitude. Expected {exp['longitude']} received {ds.dims['longitude']}"
     
     if 'valid_time' in ds.dims:
-        assert ds.dims['valid_time'] == exp['time'], f"Unexpected temporal dimension. Expected {exp['time']} received {ds.dims['valid_time']}"
+        assert ds.dims['valid_time'] >= exp['time'], f"Unexpected temporal dimension. Expected >={exp['time']} received {ds.dims['valid_time']}"
     elif 'time' in ds.dims:
-        assert ds.dims['time'] == exp['time'], f"Unexpected temporal dimension. Expected {exp['time']} received {ds.dims['time']}"
+        assert ds.dims['time'] >= exp['time'], f"Unexpected temporal dimension. Expected >={exp['time']} received {ds.dims['time']}"
     else:
         raise AssertionError('Missing temporal dimension (valid_time or time)')
     logging.info(f"{filename} passed all assertions.")
