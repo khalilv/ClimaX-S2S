@@ -38,9 +38,9 @@ def download_data(year, variable, prefix):
         logging.error(f"Failed to download data for {year}: {e}")
 
 # ----------- Specify parameters here -----------------
-variable_to_download = '10m_v_component_of_wind'
-prefix = 'v10'
-data_dir = f'/u/gracefo-m0/DATA_SERVER/s2s.dir/era5/{prefix}/'
+variable_to_download = '2m_temperature'
+prefix = 't2m'
+data_dir = f'/glade/derecho/scratch/kvirji/s2s.dir/era5/{prefix}/'
 # -----------------------------------------------------
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

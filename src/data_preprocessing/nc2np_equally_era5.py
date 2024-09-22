@@ -22,17 +22,11 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year):
         normalize_std = {}
     climatology = {}
 
-    constants = xr.open_mfdataset(os.path.join(path, "static_1.40625.nc"), combine="by_coords", parallel=True) 
+    constants = xr.open_mfdataset(os.path.join(path, "constants/constants_5.625deg.nc"), combine="by_coords", parallel=True)
     constant_fields = ["land_sea_mask", "orography", "lattitude"]
     constant_values = {}
     for f in constant_fields:
-        print(f)
-        # if partition == "train":
-        #     npy_arr = constants[NAME_TO_VAR[f]].to_numpy()
-        #     print(npy_arr.shape)
-        #     normalize_mean[f] = npy_arr.mean()
-        #     normalize_std[f] = npy_arr.std()
-        
+       
         #constants (721,1440)
         #constant_values (8760,1,721,1440) 
         #float32 each one is around ~30gb of memory
@@ -44,10 +38,6 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year):
             normalize_mean[f] = constant_values[f].mean(axis=(0, 2, 3))
             normalize_std[f] = constant_values[f].std(axis=(0, 2, 3))
 
-        #want to save slices of size t for n variables (t,n,721,1440)
-        #option 1: sample data at 6hr time intervals
-        #option 2: regrid to coarser resolution (SELECTED)
-        #option 3: spatially subset data to CA
 
     for year in tqdm(years):
         np_vars = {}
@@ -161,8 +151,8 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year):
         "2m_temperature",
         "10m_u_component_of_wind",
         "10m_v_component_of_wind",
-        "toa_incident_solar_radiation",
-        "total_precipitation",
+        # "toa_incident_solar_radiation",
+        # "total_precipitation",
         "geopotential",
         "u_component_of_wind",
         "v_component_of_wind",
