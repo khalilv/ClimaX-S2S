@@ -3,7 +3,7 @@
 
 import os
 from typing import Optional
-
+import glob 
 import numpy as np
 import torch
 import torchdata.datapipes as dp
@@ -96,7 +96,9 @@ class GlobalForecastDataModule(LightningDataModule):
         return lat, lon
 
     def get_climatology(self, partition="val", variables=None):
-        path = os.path.join(self.hparams.root_dir, partition, "climatology.npz")
+        files = glob.glob(os.path.join(self.hparams.root_dir, partition, "*climatology*.npz"))
+        assert len(files) == 1, f"Expected exactly one file in {partition} directory, but found {len(files)}"
+        path = files[0]
         clim_dict = np.load(path)
         if variables is None:
             variables = self.hparams.variables

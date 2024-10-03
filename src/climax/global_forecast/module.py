@@ -17,7 +17,6 @@ from climax.utils.metrics import (
     lat_weighted_rmse,
 )
 from climax.utils.pos_embed import interpolate_pos_embed
-from torchinfo import summary
 
 #3) Global forecast module - abstraction for training/validation/testing steps. setup for the module including hyperparameters is included here
 
@@ -53,7 +52,6 @@ class GlobalForecastModule(LightningModule):
         super().__init__()
         self.save_hyperparameters(logger=False, ignore=["net"])
         self.net = net
-        print(summary(self.net))
         if len(pretrained_path) > 0:
             self.load_pretrained_weights(pretrained_path)
 
