@@ -9,13 +9,13 @@ import numpy as np
 import xarray as xr
 from tqdm import tqdm
 
-from climax.utils.data_utils import DEFAULT_PRESSURE_LEVELS, NAME_TO_VAR
+from climax.utils.data_utils import DEFAULT_PRESSURE_LEVELS
 
 HOURS_PER_YEAR = 8760  # 365-day year
 
-def nc2np_climatology(path, variables, years, save_dir, partition):
+def nc2np_climatology(path, variables, years, save_dir, partition, hours_per_step):
     os.makedirs(os.path.join(save_dir, partition), exist_ok=True)
-
+    zarr_ds = xr.open_zarr(path)
     climatology = {}
 
     for year in tqdm(years):
@@ -23,14 +23,12 @@ def nc2np_climatology(path, variables, years, save_dir, partition):
 
         # non-constant fields
         for var in variables:
-            ps = glob.glob(os.path.join(path, var, f"*{year}*.nc"))
-            ds = xr.open_mfdataset(ps, combine="by_coords", parallel=True)  # dataset for a single variable
-            code = NAME_TO_VAR[var]
 
-            if len(ds[code].shape) == 3:  # surface level variables
-                ds[code] = ds[code].expand_dims("val", axis=1)
+            if len(zarr_ds[var].shape) == 3:  # surface level variables
+                yearly_data = zarr_ds.sel(time=str(year))[var].expand_dims("val", axis=1)
                 # remove the last 24 hours if this year has 366 days
-                np_vars[var] = ds[code].to_numpy()[:HOURS_PER_YEAR]
+                np_vars[var] = yearly_data.to_numpy()[:int(HOURS_PER_YEAR/hours_per_step)]
+                np_vars[var] = np.transpose(np_vars[var], (0,1,3,2)) #transpose to T x 1 x H x W
 
                 clim_yearly = np_vars[var].mean(axis=0)
                 if var not in climatology:
@@ -39,14 +37,15 @@ def nc2np_climatology(path, variables, years, save_dir, partition):
                     climatology[var].append(clim_yearly)
 
             else:  # multiple-level variables, only use a subset
-                assert len(ds[code].shape) == 4
-                all_levels = ds["level"][:].to_numpy()
+                assert len(zarr_ds[var].shape) == 4
+                all_levels = zarr_ds["level"][:].to_numpy()
                 all_levels = np.intersect1d(all_levels, DEFAULT_PRESSURE_LEVELS)
                 for level in all_levels:
-                    ds_level = ds.sel(level=[level])
+                    ds_level = zarr_ds.sel(level=[level], time=str(year))
                     level = int(level)
                     # remove the last 24 hours if this year has 366 days
-                    np_vars[f"{var}_{level}"] = ds_level[code].to_numpy()[:HOURS_PER_YEAR]
+                    np_vars[f"{var}_{level}"] = ds_level[var].to_numpy()[:int(HOURS_PER_YEAR/hours_per_step)]
+                    np_vars[f"{var}_{level}"] = np.transpose(np_vars[f"{var}_{level}"], (0,1,3,2)) #transpose to T x 1 x H x W
 
                     clim_yearly = np_vars[f"{var}_{level}"].mean(axis=0)
                     if f"{var}_{level}" not in climatology:
@@ -62,7 +61,7 @@ def nc2np_climatology(path, variables, years, save_dir, partition):
         **climatology,
     )
 
-def nc2np(path, variables, years, save_dir, partition, num_shards_per_year, grid_size):
+def nc2np(path, variables, years, save_dir, partition, num_shards_per_year, grid_size, hours_per_step):
     os.makedirs(os.path.join(save_dir, partition), exist_ok=True)
     zarr_ds = xr.open_zarr(path)
     zarr_ds['orography'] = zarr_ds['geopotential_at_surface']/9.80665
@@ -71,18 +70,19 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year, grid
         normalize_mean = {}
         normalize_std = {}
 
-    zarr_ds = xr.open_zarr(path)
-
-    constant_fields = ["land_sea_mask", "orography", "latitude"]
+    constant_fields = ["land_sea_mask", "orography", "lattitude"]
     constant_values = {}
     for f in constant_fields:
-        var = zarr_ds[f].to_numpy()
-        if f == 'latitude':
+        if f == 'lattitude':
+            var = zarr_ds.get('latitude', zarr_ds.get('lattitude')).to_numpy()
             var = np.tile(var, (grid_size[1], 1))
+        else:
+            var = zarr_ds[f].to_numpy()
+        
         var = var.T
                    
-        constant_values[f] = np.expand_dims(var[NAME_TO_VAR[f]].to_numpy(), axis=(0, 1)).repeat(
-            HOURS_PER_YEAR, axis=0
+        constant_values[f] = np.expand_dims(var, axis=(0, 1)).repeat(
+            int(HOURS_PER_YEAR/hours_per_step), axis=0
         )
         if partition == "train":
             normalize_mean[f] = constant_values[f].mean(axis=(0, 2, 3))
@@ -98,14 +98,12 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year, grid
 
         # non-constant fields
         for var in variables:
-            ps = glob.glob(os.path.join(path, var, f"*{year}*.nc"))
-            ds = xr.open_mfdataset(ps, combine="by_coords", parallel=True)  # dataset for a single variable
-            code = NAME_TO_VAR[var]
 
-            if len(ds[code].shape) == 3:  # surface level variables
-                ds[code] = ds[code].expand_dims("val", axis=1)
+            if len(zarr_ds[var].shape) == 3:  # surface level variables
+                yearly_data = zarr_ds.sel(time=str(year))[var].expand_dims("val", axis=1)
                 # remove the last 24 hours if this year has 366 days
-                np_vars[var] = ds[code].to_numpy()[:HOURS_PER_YEAR]
+                np_vars[var] = yearly_data.to_numpy()[:int(HOURS_PER_YEAR/hours_per_step)]
+                np_vars[var] = np.transpose(np_vars[var], (0,1,3,2)) #transpose to T x 1 x H x W
 
                 if partition == "train":  # compute mean and std of each var in each year
                     var_mean_yearly = np_vars[var].mean(axis=(0, 2, 3))
@@ -118,14 +116,15 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year, grid
                         normalize_std[var].append(var_std_yearly)
 
             else:  # multiple-level variables, only use a subset
-                assert len(ds[code].shape) == 4
-                all_levels = ds["level"][:].to_numpy()
+                assert len(zarr_ds[var].shape) == 4
+                all_levels = zarr_ds["level"][:].to_numpy()
                 all_levels = np.intersect1d(all_levels, DEFAULT_PRESSURE_LEVELS)
                 for level in all_levels:
-                    ds_level = ds.sel(level=[level])
+                    ds_level = zarr_ds.sel(level=[level], time=str(year))
                     level = int(level)
                     # remove the last 24 hours if this year has 366 days
-                    np_vars[f"{var}_{level}"] = ds_level[code].to_numpy()[:HOURS_PER_YEAR]
+                    np_vars[f"{var}_{level}"] = ds_level[var].to_numpy()[:int(HOURS_PER_YEAR/hours_per_step)]
+                    np_vars[f"{var}_{level}"] = np.transpose(np_vars[f"{var}_{level}"], (0,1,3,2)) #transpose to T x 1 x H x W
 
                     if partition == "train":  # compute mean and std of each var in each year
                         var_mean_yearly = np_vars[f"{var}_{level}"].mean(axis=(0, 2, 3))
@@ -137,11 +136,11 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year, grid
                             normalize_mean[f"{var}_{level}"].append(var_mean_yearly)
                             normalize_std[f"{var}_{level}"].append(var_std_yearly)
 
-        assert HOURS_PER_YEAR % num_shards_per_year == 0
-        num_hrs_per_shard = HOURS_PER_YEAR // num_shards_per_year
+        assert int(HOURS_PER_YEAR/hours_per_step) % num_shards_per_year == 0
+        num_steps_per_shard = int(HOURS_PER_YEAR/hours_per_step) // num_shards_per_year
         for shard_id in range(num_shards_per_year):
-            start_id = shard_id * num_hrs_per_shard
-            end_id = start_id + num_hrs_per_shard
+            start_id = shard_id * num_steps_per_shard
+            end_id = start_id + num_steps_per_shard
             sharded_data = {k: np_vars[k][start_id:end_id] for k in np_vars.keys()}
             np.savez(
                 os.path.join(save_dir, partition, f"{year}_{shard_id}.npz"),
@@ -196,6 +195,8 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year, grid
 @click.option("--start_test_year", type=int, default=2017)
 @click.option("--end_year", type=int, default=2019)
 @click.option("--num_shards", type=int, default=8)
+@click.option("--grid_size", type=(int, int), default=(32, 64))
+@click.option("--hours_per_step", type=int, default=1)
 def main(
     root_dir,
     save_dir,
@@ -205,6 +206,8 @@ def main(
     start_test_year,
     end_year,
     num_shards,
+    grid_size,
+    hours_per_step
 ):
     assert start_val_year > start_train_year and start_test_year > start_val_year and end_year > start_test_year
     train_years = range(start_train_year, start_val_year)
@@ -213,20 +216,19 @@ def main(
 
     os.makedirs(save_dir, exist_ok=True)
 
-    nc2np(root_dir, variables, train_years, save_dir, "train", num_shards)
-    nc2np(root_dir, variables, val_years, save_dir, "val", num_shards)
-    nc2np(root_dir, variables, test_years, save_dir, "test", num_shards)
+    nc2np(root_dir, variables, train_years, save_dir, "train", num_shards, grid_size, hours_per_step)
+    nc2np(root_dir, variables, val_years, save_dir, "val", num_shards, grid_size, hours_per_step)
+    nc2np(root_dir, variables, test_years, save_dir, "test", num_shards, grid_size, hours_per_step)
 
     climatology_val_years = train_years
     climatology_test_years = range(start_train_year, start_test_year)
-    nc2np_climatology(root_dir, variables, climatology_val_years, save_dir, "val")
-    nc2np_climatology(root_dir, variables, climatology_test_years, save_dir, "test")
+    nc2np_climatology(root_dir, variables, climatology_val_years, save_dir, "val", hours_per_step)
+    nc2np_climatology(root_dir, variables, climatology_test_years, save_dir, "test", hours_per_step)
 
     # save lat and lon data
-    ps = glob.glob(os.path.join(root_dir, variables[0], f"*{train_years[0]}*.nc"))
-    x = xr.open_mfdataset(ps[0], parallel=True)
-    lat = x["lat"].to_numpy()
-    lon = x["lon"].to_numpy()
+    zarr_ds = xr.open_zarr(root_dir)
+    lat = zarr_ds["latitude"].to_numpy()
+    lon = zarr_ds["longitude"].to_numpy()
     np.save(os.path.join(save_dir, "lat.npy"), lat)
     np.save(os.path.join(save_dir, "lon.npy"), lon)
 
