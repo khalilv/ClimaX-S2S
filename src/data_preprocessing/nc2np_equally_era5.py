@@ -32,11 +32,10 @@ def nc2np_climatology(path, variables, years, save_dir, partition):
                 # remove the last 24 hours if this year has 366 days
                 np_vars[var] = ds[code].to_numpy()[:HOURS_PER_YEAR]
 
-                clim_yearly = np_vars[var].mean(axis=0)
                 if var not in climatology:
-                    climatology[var] = [clim_yearly]
+                    climatology[var] = [np_vars[var]]
                 else:
-                    climatology[var].append(clim_yearly)
+                    climatology[var].append(np_vars[var])
 
             else:  # multiple-level variables, only use a subset
                 assert len(ds[code].shape) == 4
@@ -48,15 +47,20 @@ def nc2np_climatology(path, variables, years, save_dir, partition):
                     # remove the last 24 hours if this year has 366 days
                     np_vars[f"{var}_{level}"] = ds_level[code].to_numpy()[:HOURS_PER_YEAR]
 
-                    clim_yearly = np_vars[f"{var}_{level}"].mean(axis=0)
                     if f"{var}_{level}" not in climatology:
-                        climatology[f"{var}_{level}"] = [clim_yearly]
+                        climatology[f"{var}_{level}"] = [np_vars[f"{var}_{level}"]]
                     else:
-                        climatology[f"{var}_{level}"].append(clim_yearly)
-
+                        climatology[f"{var}_{level}"].append(np_vars[f"{var}_{level}"])
+    
     for var in climatology.keys():
         climatology[var] = np.stack(climatology[var], axis=0)
     climatology = {k: np.mean(v, axis=0) for k, v in climatology.items()}
+    
+    #save timestamps
+    timestamps = ds.time.to_numpy()[:HOURS_PER_YEAR]
+    timestamps = [np.datetime_as_string(datetime, unit='m')[5:] for datetime in timestamps]
+    climatology['timestamps'] = np.array(timestamps)
+    
     np.savez(
         os.path.join(save_dir, partition, f"climatology_{years[0]}_{years[-1]}.npz" if len(years) > 1 else f"climatology_{years[0]}.npz"),
         **climatology,
@@ -133,6 +137,11 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year):
                         else:
                             normalize_mean[f"{var}_{level}"].append(var_mean_yearly)
                             normalize_std[f"{var}_{level}"].append(var_std_yearly)
+        
+        #save timestamps
+        timestamps = ds.time.to_numpy()[:HOURS_PER_YEAR]
+        timestamps = [np.datetime_as_string(datetime, unit='m')[5:] for datetime in timestamps]
+        np_vars['timestamps'] = np.array(timestamps)
 
         assert HOURS_PER_YEAR % num_shards_per_year == 0
         num_hrs_per_shard = HOURS_PER_YEAR // num_shards_per_year
@@ -178,8 +187,8 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year):
         "2m_temperature",
         "10m_u_component_of_wind",
         "10m_v_component_of_wind",
-        # "toa_incident_solar_radiation",
-        # "total_precipitation",
+        "toa_incident_solar_radiation",
+        "total_precipitation",
         "geopotential",
         "u_component_of_wind",
         "v_component_of_wind",
@@ -214,8 +223,8 @@ def main(
     nc2np(root_dir, variables, val_years, save_dir, "val", num_shards)
     nc2np(root_dir, variables, test_years, save_dir, "test", num_shards)
 
-    climatology_val_years = train_years
-    climatology_test_years = range(start_train_year, start_test_year)
+    climatology_val_years = range(1990, start_val_year)
+    climatology_test_years = range(1990, start_test_year)
     nc2np_climatology(root_dir, variables, climatology_val_years, save_dir, "val")
     nc2np_climatology(root_dir, variables, climatology_test_years, save_dir, "test")
 
