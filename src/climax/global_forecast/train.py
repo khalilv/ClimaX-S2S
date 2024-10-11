@@ -34,10 +34,10 @@ def main():
     cli.model.init_network(cli.datamodule.in_variables)
 
     # fit() runs the training
-    # cli.trainer.fit(cli.model, datamodule=cli.datamodule)
+    cli.trainer.fit(cli.model, datamodule=cli.datamodule)
 
     # test the trained model
-    cli.trainer.test(cli.model, datamodule=cli.datamodule, ckpt_path="/glade/derecho/scratch/kvirji/ClimaX-S2S/exps/global_forecast_t2m_14d/checkpoints/epoch_015.ckpt")
+    cli.trainer.test(cli.model, datamodule=cli.datamodule, ckpt_path="best")
 
 
 if __name__ == "__main__":
