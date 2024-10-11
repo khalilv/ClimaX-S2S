@@ -16,7 +16,7 @@ class NpyReader(IterableDataset):
         file_list,
         start_idx,
         end_idx,
-        variables,
+        in_variables,
         out_variables,
         shuffle: bool = False,
         multi_dataset_training=False,
@@ -26,8 +26,8 @@ class NpyReader(IterableDataset):
         end_idx = int(end_idx * len(file_list))
         file_list = file_list[start_idx:end_idx]
         self.file_list = [f for f in file_list if "climatology" not in f]
-        self.variables = variables
-        self.out_variables = out_variables if out_variables is not None else variables
+        self.in_variables = in_variables
+        self.out_variables = out_variables if out_variables is not None else in_variables
         self.shuffle = shuffle
         self.multi_dataset_training = multi_dataset_training
 
@@ -61,7 +61,7 @@ class NpyReader(IterableDataset):
         for idx in range(iter_start, iter_end):
             path = self.file_list[idx]
             data = np.load(path)
-            yield {k: data[k] for k in self.variables}, self.variables, self.out_variables
+            yield {k: data[k] for k in self.in_variables}, self.in_variables, self.out_variables, data['timestamps']
 
 
 class Forecast(IterableDataset):
@@ -75,7 +75,7 @@ class Forecast(IterableDataset):
         self.hrs_each_step = hrs_each_step
 
     def __iter__(self):
-        for data, variables, out_variables in self.dataset:
+        for data, in_variables, out_variables, timestamps in self.dataset:
             x = np.concatenate([data[k].astype(np.float32) for k in data.keys()], axis=1) # T (8760/n_shards_per_year = 1095), V_in, H, W
             x = torch.from_numpy(x)
             y = np.concatenate([data[k].astype(np.float32) for k in out_variables], axis=1) # T (8760/n_shards_per_year = 1095), V_out, H, W
@@ -91,26 +91,27 @@ class Forecast(IterableDataset):
             lead_times = lead_times.to(inputs.dtype)
             output_ids = torch.arange(inputs.shape[0]) + predict_ranges
             outputs = y[output_ids]
+            output_timestamps = timestamps[output_ids]
 
-            yield inputs, outputs, lead_times, variables, out_variables
+            yield inputs, outputs, lead_times, in_variables, out_variables, output_timestamps
 
 
 class IndividualForecastDataIter(IterableDataset):
-    def __init__(self, dataset, transforms: torch.nn.Module, output_transforms: torch.nn.Module, region_info = None):
+    def __init__(self, dataset, in_transforms: torch.nn.Module, output_transforms: torch.nn.Module, region_info = None):
         super().__init__()
         self.dataset = dataset
-        self.transforms = transforms
+        self.in_transforms = in_transforms
         self.output_transforms = output_transforms
         self.region_info = region_info
 
     def __iter__(self):
-        for (inp, out, lead_times, variables, out_variables) in self.dataset:
+        for (inp, out, lead_times, in_variables, out_variables, output_timestamps) in self.dataset:
             assert inp.shape[0] == out.shape[0]
             for i in range(inp.shape[0]):
                 if self.region_info is not None:
-                    yield self.transforms(inp[i]), self.output_transforms(out[i]), lead_times[i], variables, out_variables, self.region_info
+                    yield self.in_transforms(inp[i]), self.output_transforms(out[i]), lead_times[i], in_variables, out_variables, self.region_info, output_timestamps[i]
                 else:
-                    yield self.transforms(inp[i]), self.output_transforms(out[i]), lead_times[i], variables, out_variables
+                    yield self.in_transforms(inp[i]), self.output_transforms(out[i]), lead_times[i], in_variables, out_variables, output_timestamps[i]
 
 
 class ShuffleIterableDataset(IterableDataset):

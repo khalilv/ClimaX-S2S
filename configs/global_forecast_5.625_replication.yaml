@@ -2,11 +2,11 @@ seed_everything: 42
 
 # ---------------------------- TRAINER -------------------------------------------
 trainer:
-  default_root_dir: /glade/derecho/scratch/kvirji/ClimaX-S2S/exps/global_forecast_t2m
+  default_root_dir: /glade/derecho/scratch/kvirji/ClimaX-S2S/exps/weatherbench2_metrics/t2m_14d_n_shards_1
 
   precision: 16
 
-  gpus: 4
+  gpus: 1
   num_nodes: 1
   accelerator: gpu
   strategy: ddp
@@ -72,74 +72,22 @@ model:
   warmup_start_lr: 1e-8
   eta_min: 1e-8
   pretrained_path: /glade/derecho/scratch/kvirji/ClimaX-S2S/pretrained_weights/5.625deg.ckpt
+  img_size: [32, 64]
+  patch_size: 2
+  embed_dim: 1024
+  depth: 8
+  decoder_depth: 2
+  num_heads: 16
+  mlp_ratio: 4
+  drop_path: 0.1
+  drop_rate: 0.1
+  parallel_patch_embed: False
 
-  net:
-    class_path: climax.arch.ClimaX
-    init_args:
-      default_vars: [
-          "land_sea_mask",
-          "orography",
-          "lattitude",
-          "2m_temperature",
-          "10m_u_component_of_wind",
-          "10m_v_component_of_wind",
-          "geopotential_50",
-          "geopotential_250",
-          "geopotential_500",
-          "geopotential_600",
-          "geopotential_700",
-          "geopotential_850",
-          "geopotential_925",
-          "u_component_of_wind_50",
-          "u_component_of_wind_250",
-          "u_component_of_wind_500",
-          "u_component_of_wind_600",
-          "u_component_of_wind_700",
-          "u_component_of_wind_850",
-          "u_component_of_wind_925",
-          "v_component_of_wind_50",
-          "v_component_of_wind_250",
-          "v_component_of_wind_500",
-          "v_component_of_wind_600",
-          "v_component_of_wind_700",
-          "v_component_of_wind_850",
-          "v_component_of_wind_925",
-          "temperature_50",
-          "temperature_250",
-          "temperature_500",
-          "temperature_600",
-          "temperature_700",
-          "temperature_850",
-          "temperature_925",
-          "relative_humidity_50",
-          "relative_humidity_250",
-          "relative_humidity_500",
-          "relative_humidity_600",
-          "relative_humidity_700",
-          "relative_humidity_850",
-          "relative_humidity_925",
-          "specific_humidity_50",
-          "specific_humidity_250",
-          "specific_humidity_500",
-          "specific_humidity_600",
-          "specific_humidity_700",
-          "specific_humidity_850",
-          "specific_humidity_925",
-        ]
-      img_size: [32, 64]
-      patch_size: 2
-      embed_dim: 1024
-      depth: 8
-      decoder_depth: 2
-      num_heads: 16
-      mlp_ratio: 4
-      drop_path: 0.1
-      drop_rate: 0.1
 
 # ---------------------------- DATA -------------------------------------------
 data:
   root_dir: /glade/derecho/scratch/kvirji/all_5.625deg_preprocessed_n_shards_1
-  variables: [
+  in_variables: [
       "land_sea_mask",
       "orography",
       "lattitude",
@@ -191,9 +139,9 @@ data:
     ]
   out_variables: ["2m_temperature"]
   # predict_range (steps) * hrs_each_step = lead_time (hrs)
-  predict_range: 168
+  predict_range: 336
   hrs_each_step: 1
   buffer_size: 10000
   batch_size: 32
-  num_workers: 1
+  num_workers: 0
   pin_memory: False

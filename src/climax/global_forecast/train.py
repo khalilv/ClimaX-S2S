@@ -27,15 +27,17 @@ def main():
     mean_denorm, std_denorm = -mean_norm / std_norm, 1 / std_norm
     cli.model.set_denormalization(mean_denorm, std_denorm)
     cli.model.set_lat_lon(*cli.datamodule.get_lat_lon())
-    cli.model.set_pred_range(cli.datamodule.hparams.predict_range)
-    cli.model.set_val_clim(cli.datamodule.val_clim)
-    cli.model.set_test_clim(cli.datamodule.test_clim)
+    cli.model.set_variables(cli.datamodule.in_variables, cli.datamodule.out_variables)
+    cli.model.set_val_clim(cli.datamodule.val_clim, cli.datamodule.val_clim_timestamps)
+    cli.model.set_test_clim(cli.datamodule.test_clim, cli.datamodule.val_clim_timestamps)
+    cli.model.init_metrics()
+    cli.model.init_network(cli.datamodule.in_variables)
 
     # fit() runs the training
-    cli.trainer.fit(cli.model, datamodule=cli.datamodule)
+    # cli.trainer.fit(cli.model, datamodule=cli.datamodule)
 
     # test the trained model
-    cli.trainer.test(cli.model, datamodule=cli.datamodule, ckpt_path="best")
+    cli.trainer.test(cli.model, datamodule=cli.datamodule, ckpt_path="/glade/derecho/scratch/kvirji/ClimaX-S2S/exps/global_forecast_t2m_14d/checkpoints/epoch_015.ckpt")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 # Licensed under the MIT license.
 
 import numpy as np
+import torch 
 
 NAME_TO_VAR = {
     "2m_temperature": "t2m",
@@ -121,3 +122,19 @@ def get_region_info(region, lat, lon, patch_size):
         'min_w': min_w,
         'max_w': max_w
     }
+
+def collate_fn(batch):
+    inp = torch.stack([batch[i][0] for i in range(len(batch))])
+    out = torch.stack([batch[i][1] for i in range(len(batch))])
+    lead_times = torch.stack([batch[i][2] for i in range(len(batch))])
+    variables = batch[0][3]
+    out_variables = batch[0][4]
+    output_timestamps = [batch[i][5] for i in range(len(batch))]
+    return (
+        inp,
+        out,
+        lead_times,
+        [v for v in variables],
+        [v for v in out_variables],
+        output_timestamps
+    )

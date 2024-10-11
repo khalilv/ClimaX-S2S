@@ -22,7 +22,7 @@ class ClimaX(nn.Module):
     https://arxiv.org/abs/2301.10343
 
     Args:
-        default_vars (list): list of default variables to be used for training
+        in_vars (list): list of variables to be used for training
         img_size (list): image size of the input data
         patch_size (int): patch size of the input data
         embed_dim (int): embedding dimension
@@ -37,7 +37,7 @@ class ClimaX(nn.Module):
 
     def __init__(
         self,
-        default_vars,
+        in_vars,
         img_size=[32, 64],
         patch_size=2,
         embed_dim=1024,
@@ -51,18 +51,17 @@ class ClimaX(nn.Module):
     ):
         super().__init__()
 
-        # TODO: remove time_history parameter
         self.img_size = img_size
         self.patch_size = patch_size
-        self.default_vars = default_vars
+        self.in_vars = in_vars
         self.parallel_patch_embed = parallel_patch_embed
         # variable tokenization: separate embedding layer for each input variable
         if self.parallel_patch_embed:
-            self.token_embeds = ParallelVarPatchEmbed(len(default_vars), img_size, patch_size, embed_dim)
+            self.token_embeds = ParallelVarPatchEmbed(len(in_vars), img_size, patch_size, embed_dim)
             self.num_patches = self.token_embeds.num_patches
         else:
             self.token_embeds = nn.ModuleList(
-                [PatchEmbed(img_size, patch_size, 1, embed_dim) for i in range(len(default_vars))]
+                [PatchEmbed(img_size, patch_size, 1, embed_dim) for i in range(len(in_vars))]
             )
             self.num_patches = self.token_embeds[0].num_patches
 
@@ -106,7 +105,7 @@ class ClimaX(nn.Module):
         for _ in range(decoder_depth):
             self.head.append(nn.Linear(embed_dim, embed_dim))
             self.head.append(nn.GELU())
-        self.head.append(nn.Linear(embed_dim, len(self.default_vars) * patch_size**2))
+        self.head.append(nn.Linear(embed_dim, len(self.in_vars) * patch_size**2))
         self.head = nn.Sequential(*self.head)
 
         # --------------------------------------------------------------------------
@@ -123,7 +122,7 @@ class ClimaX(nn.Module):
         )
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
 
-        var_embed = get_1d_sincos_pos_embed_from_grid(self.var_embed.shape[-1], np.arange(len(self.default_vars)))
+        var_embed = get_1d_sincos_pos_embed_from_grid(self.var_embed.shape[-1], np.arange(len(self.in_vars)))
         self.var_embed.data.copy_(torch.from_numpy(var_embed).float().unsqueeze(0))
 
         # token embedding layer
@@ -149,11 +148,11 @@ class ClimaX(nn.Module):
             nn.init.constant_(m.weight, 1.0)
 
     def create_var_embedding(self, dim):
-        var_embed = nn.Parameter(torch.zeros(1, len(self.default_vars), dim), requires_grad=True)
+        var_embed = nn.Parameter(torch.zeros(1, len(self.in_vars), dim), requires_grad=True)
         # TODO: create a mapping from var --> idx
         var_map = {}
         idx = 0
-        for var in self.default_vars:
+        for var in self.in_vars:
             var_map[var] = idx
             idx += 1
         return var_embed, var_map
@@ -173,7 +172,7 @@ class ClimaX(nn.Module):
         return imgs: (B, V, H, W)
         """
         p = self.patch_size
-        c = len(self.default_vars)
+        c = len(self.in_vars)
         h = self.img_size[0] // p if h is None else h // p
         w = self.img_size[1] // p if w is None else w // p
         assert h * w == x.shape[1]
@@ -244,16 +243,16 @@ class ClimaX(nn.Module):
 
         return x
 
-    def forward(self, x, y, lead_times, variables, out_variables, metric, lat):
+    def forward(self, x, lead_times, variables, out_variables):
         """Forward pass through the model.
 
         Args:
             x: `[B, Vi, H, W]` shape. Input weather/climate variables
-            y: `[B, Vo, H, W]` shape. Target weather/climate variables
             lead_times: `[B]` shape. Forecasting lead times of each element of the batch.
+            variables: `[Vi]` shape. Names of input variables.
+            output_variables: `[Vo]` shape. Names of output variables.
 
         Returns:
-            loss (list): Different metrics.
             preds (torch.Tensor): `[B, Vo, H, W]` shape. Predicted weather/climate variables.
         """
         out_transformers = self.forward_encoder(x, lead_times, variables)  # B, L, D
@@ -263,13 +262,4 @@ class ClimaX(nn.Module):
         out_var_ids = self.get_var_ids(tuple(out_variables), preds.device)
         preds = preds[:, out_var_ids]
 
-        if metric is None:
-            loss = None
-        else:
-            loss = [m(preds, y, out_variables, lat) for m in metric]
-
-        return loss, preds
-
-    def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix):
-        _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
-        return [m(preds, y, transform, out_variables, lat, clim, log_postfix) for m in metrics]
+        return preds
