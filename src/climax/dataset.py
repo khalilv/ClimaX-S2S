@@ -18,6 +18,9 @@ class NpyReader(IterableDataset):
         end_idx,
         in_variables,
         out_variables,
+        max_predict_range: int = 6,
+        history_range: int = 1,
+        hrs_each_step: int = 1,
         shuffle: bool = False,
         multi_dataset_training=False,
     ) -> None:
@@ -30,6 +33,9 @@ class NpyReader(IterableDataset):
         self.out_variables = out_variables if out_variables is not None else in_variables
         self.shuffle = shuffle
         self.multi_dataset_training = multi_dataset_training
+        self.max_predict_range = max_predict_range
+        self.history_range = history_range
+        self.hrs_each_step = hrs_each_step
 
     def __iter__(self):
         if self.shuffle:
@@ -57,42 +63,61 @@ class NpyReader(IterableDataset):
             worker_id = rank * num_workers_per_ddp + worker_info.id
             iter_start = worker_id * per_worker
             iter_end = iter_start + per_worker
-
+        
+        #carry_over_data prevents needlessly throwing out data samples. 
+        #it will only be used if files have temporal ordering (i.e. shuffle=false)
+        self.carry_over_data = None 
         for idx in range(iter_start, iter_end):
             path = self.file_list[idx]
             data = np.load(path)
-            yield {k: data[k] for k in self.in_variables}, self.in_variables, self.out_variables, data['timestamps']
+            data_dict  = {k: data[k] for k in self.in_variables}
+            timestamps = data['timestamps']
+            if self.carry_over_data is not None and not self.shuffle:
+                for k in self.in_variables:
+                    data_dict[k] = np.concatenate([self.carry_over_data[k], data_dict[k]], axis=0)
+                timestamps = np.concatenate([self.carry_over_data['timestamps'], timestamps], axis=0)
+
+            if not self.shuffle and idx < iter_end - 1:
+                self.carry_over_data = {k: data_dict[k][-(self.max_predict_range + self.history_range - 1):] for k in self.in_variables}
+                self.carry_over_data['timestamps'] = timestamps[-(self.max_predict_range + self.history_range - 1):]
+            
+            yield data_dict, self.in_variables, self.out_variables, timestamps, self.max_predict_range, self.history_range, self.hrs_each_step
 
 
 class Forecast(IterableDataset):
     def __init__(
-        self, dataset: NpyReader, max_predict_range: int = 6, random_lead_time: bool = False, hrs_each_step: int = 1
+        self, dataset: NpyReader, random_lead_time: bool = False
     ) -> None:
         super().__init__()
         self.dataset = dataset
-        self.max_predict_range = max_predict_range
         self.random_lead_time = random_lead_time
-        self.hrs_each_step = hrs_each_step
 
     def __iter__(self):
-        for data, in_variables, out_variables, timestamps in self.dataset:
-            x = np.concatenate([data[k].astype(np.float32) for k in data.keys()], axis=1) # T (8760/n_shards_per_year = 1095), V_in, H, W
+        for data, in_variables, out_variables, timestamps, max_predict_range, history_range, hrs_each_step in self.dataset:
+            x = np.concatenate([data[k].astype(np.float32) for k in data.keys()], axis=1) # T, V_in, H, W
             x = torch.from_numpy(x)
-            y = np.concatenate([data[k].astype(np.float32) for k in out_variables], axis=1) # T (8760/n_shards_per_year = 1095), V_out, H, W
+            y = np.concatenate([data[k].astype(np.float32) for k in out_variables], axis=1) # T, V_out, H, W
             y = torch.from_numpy(y)
 
-            inputs = x[: -self.max_predict_range]  # T - lead time, V_in, H, W
+            
+            inputs = torch.empty((x.shape[0] - history_range - max_predict_range + 1, 
+                                  history_range, x.shape[1], x.shape[2], x.shape[3])) #T,R,V,H,W where R = history size
+            input_timestamps = [] #for debugging
 
+            for t in range(history_range, x.shape[0]-max_predict_range + 1):
+                inputs[t-history_range] = x[t-history_range:t]
+                input_timestamps.append(timestamps[t-1])
+            
             if self.random_lead_time:
-                predict_ranges = torch.randint(low=1, high=self.max_predict_range, size=(inputs.shape[0],))
+                predict_ranges = torch.randint(low=1, high=max_predict_range, size=(inputs.shape[0],))
             else:
-                predict_ranges = torch.ones(inputs.shape[0]).to(torch.long) * self.max_predict_range
-            lead_times = self.hrs_each_step * predict_ranges / 100
+                predict_ranges = torch.ones(inputs.shape[0]).to(torch.long) * max_predict_range
+            lead_times = hrs_each_step * predict_ranges / 100
             lead_times = lead_times.to(inputs.dtype)
-            output_ids = torch.arange(inputs.shape[0]) + predict_ranges
+            output_ids = torch.arange(inputs.shape[0]) + predict_ranges + history_range - 1
             outputs = y[output_ids]
             output_timestamps = timestamps[output_ids]
-
+            
             yield inputs, outputs, lead_times, in_variables, out_variables, output_timestamps
 
 

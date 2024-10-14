@@ -157,7 +157,10 @@ class GlobalForecastModule(LightningModule):
     def training_step(self, batch: Any, batch_idx: int):
         x, y, lead_times, variables, out_variables, _ = batch #spread batch data 
  
-        #run the model and calculate the loss based on lat_weighted_mse
+        if x.shape[1] > 1:
+            raise NotImplementedError("history_range > 1 is not supported yet.")
+        x = x.squeeze() #squeeze history dimension
+   
         preds = self.net.forward(x, lead_times, variables, out_variables)
         preds = preds.to(self.device).float()
         y = y.to(self.device).float()
@@ -173,6 +176,10 @@ class GlobalForecastModule(LightningModule):
     
     def validation_step(self, batch: Any, batch_idx: int):
         x, y, lead_times, variables, out_variables, output_timestamps = batch
+
+        if x.shape[1] > 1:
+            raise NotImplementedError("history_range > 1 is not supported yet.")
+        x = x.squeeze() #squeeze history dimension
 
         preds = self.net.forward(x, lead_times, variables, out_variables)
         preds = preds.float()
@@ -200,6 +207,10 @@ class GlobalForecastModule(LightningModule):
 
     def test_step(self, batch: Any, batch_idx: int):
         x, y, lead_times, variables, out_variables, output_timestamps = batch
+
+        if x.shape[1] > 1:
+            raise NotImplementedError("history_range > 1 is not supported yet.")
+        x = x.squeeze() #squeeze history dimension
 
         preds = self.net.forward(x, lead_times, variables, out_variables)
         preds = preds.float()

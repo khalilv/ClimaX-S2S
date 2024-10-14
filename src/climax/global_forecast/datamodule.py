@@ -41,6 +41,7 @@ class GlobalForecastDataModule(LightningDataModule):
         buffer_size,
         out_variables=None,
         predict_range: int = 6,
+        history_range: int = 1,
         hrs_each_step: int = 1,
         batch_size: int = 64,
         num_workers: int = 0,
@@ -64,6 +65,7 @@ class GlobalForecastDataModule(LightningDataModule):
         self.out_variables = out_variables
         self.buffer_size = buffer_size
         self.predict_range = predict_range
+        self.history_range = history_range
         self.hrs_each_step = hrs_each_step
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -123,12 +125,13 @@ class GlobalForecastDataModule(LightningDataModule):
                             end_idx=1,
                             in_variables=self.in_variables,
                             out_variables=self.out_variables,
-                            shuffle=True,
+                            shuffle=False,
                             multi_dataset_training=False,
+                            max_predict_range=self.predict_range,
+                            history_range=self.history_range,
+                            hrs_each_step=self.hrs_each_step,
                         ),
-                        max_predict_range=self.predict_range,
                         random_lead_time=False,
-                        hrs_each_step=self.hrs_each_step,
                     ),
                     in_transforms=self.in_transforms,
                     output_transforms=self.output_transforms,
@@ -146,10 +149,11 @@ class GlobalForecastDataModule(LightningDataModule):
                         out_variables=self.out_variables,
                         shuffle=False,
                         multi_dataset_training=False,
+                        max_predict_range=self.predict_range,
+                        history_range=self.history_range,
+                        hrs_each_step=self.hrs_each_step,
                     ),
-                    max_predict_range=self.predict_range,
                     random_lead_time=False,
-                    hrs_each_step=self.hrs_each_step,
                 ),
                 in_transforms=self.in_transforms,
                 output_transforms=self.output_transforms,
@@ -165,10 +169,11 @@ class GlobalForecastDataModule(LightningDataModule):
                         out_variables=self.out_variables,
                         shuffle=False,
                         multi_dataset_training=False,
+                        max_predict_range=self.predict_range,
+                        history_range=self.history_range,
+                        hrs_each_step=self.hrs_each_step,
                     ),
-                    max_predict_range=self.predict_range,
                     random_lead_time=False,
-                    hrs_each_step=self.hrs_each_step,
                 ),
                 in_transforms=self.in_transforms,
                 output_transforms=self.output_transforms,
