@@ -102,12 +102,13 @@ class Forecast(IterableDataset):
             
             inputs = torch.empty((x.shape[0] - history_range - max_predict_range + 1, 
                                   history_range, x.shape[1], x.shape[2], x.shape[3])) #T,R,V,H,W where R = history size
-            input_timestamps = [] #for debugging
+            input_timestamps = []
 
             for t in range(history_range, x.shape[0]-max_predict_range + 1):
                 inputs[t-history_range] = x[t-history_range:t]
-                input_timestamps.append(timestamps[t-1])
-            
+                input_timestamps.append(timestamps[t-history_range:t])
+            input_timestamps = np.array(input_timestamps)
+
             if self.random_lead_time:
                 predict_ranges = torch.randint(low=1, high=max_predict_range, size=(inputs.shape[0],))
             else:
@@ -118,7 +119,7 @@ class Forecast(IterableDataset):
             outputs = y[output_ids]
             output_timestamps = timestamps[output_ids]
             
-            yield inputs, outputs, lead_times, in_variables, out_variables, output_timestamps
+            yield inputs, outputs, lead_times, in_variables, out_variables, input_timestamps, output_timestamps
 
 
 class IndividualForecastDataIter(IterableDataset):
@@ -128,15 +129,17 @@ class IndividualForecastDataIter(IterableDataset):
         self.in_transforms = in_transforms
         self.output_transforms = output_transforms
         self.region_info = region_info
+        if region_info is not None:
+            raise NotImplementedError("Regional forecast is not supported yet.")
 
     def __iter__(self):
-        for (inp, out, lead_times, in_variables, out_variables, output_timestamps) in self.dataset:
+        for (inp, out, lead_times, in_variables, out_variables, input_timestamps, output_timestamps) in self.dataset:
             assert inp.shape[0] == out.shape[0]
             for i in range(inp.shape[0]):
                 if self.region_info is not None:
-                    yield self.in_transforms(inp[i]), self.output_transforms(out[i]), lead_times[i], in_variables, out_variables, self.region_info, output_timestamps[i]
+                    yield self.in_transforms(inp[i]), self.output_transforms(out[i]), lead_times[i], in_variables, out_variables, self.region_info, input_timestamps[i], output_timestamps[i]
                 else:
-                    yield self.in_transforms(inp[i]), self.output_transforms(out[i]), lead_times[i], in_variables, out_variables, output_timestamps[i]
+                    yield self.in_transforms(inp[i]), self.output_transforms(out[i]), lead_times[i], in_variables, out_variables, input_timestamps[i], output_timestamps[i]
 
 
 class ShuffleIterableDataset(IterableDataset):

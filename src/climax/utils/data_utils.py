@@ -131,13 +131,15 @@ def collate_fn(batch):
     lead_times = torch.stack([batch[i][2] for i in range(len(batch))])
     variables = batch[0][3]
     out_variables = batch[0][4]
-    output_timestamps = [batch[i][5] for i in range(len(batch))]
+    input_timestamps = [batch[i][5] for i in range(len(batch))]
+    output_timestamps = [batch[i][6] for i in range(len(batch))]
     return (
         inp,
         out,
         lead_times,
         [v for v in variables],
         [v for v in out_variables],
+        input_timestamps,
         output_timestamps
     )
 

@@ -155,7 +155,7 @@ class GlobalForecastModule(LightningModule):
 
     # can add multi-step training here - add k rollouts then average the loss before returning
     def training_step(self, batch: Any, batch_idx: int):
-        x, y, lead_times, variables, out_variables, _ = batch #spread batch data 
+        x, y, lead_times, variables, out_variables, input_timestamps, output_timestamps = batch #spread batch data 
  
         if x.shape[1] > 1:
             raise NotImplementedError("history_range > 1 is not supported yet.")
@@ -175,7 +175,7 @@ class GlobalForecastModule(LightningModule):
         return batch_loss['w_mse']
     
     def validation_step(self, batch: Any, batch_idx: int):
-        x, y, lead_times, variables, out_variables, output_timestamps = batch
+        x, y, lead_times, variables, out_variables, input_timestamps, output_timestamps = batch
 
         if x.shape[1] > 1:
             raise NotImplementedError("history_range > 1 is not supported yet.")
@@ -206,7 +206,7 @@ class GlobalForecastModule(LightningModule):
         self.val_lat_weighted_acc.reset()
 
     def test_step(self, batch: Any, batch_idx: int):
-        x, y, lead_times, variables, out_variables, output_timestamps = batch
+        x, y, lead_times, variables, out_variables, input_timestamps, output_timestamps = batch
 
         if x.shape[1] > 1:
             raise NotImplementedError("history_range > 1 is not supported yet.")

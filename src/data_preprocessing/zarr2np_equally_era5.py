@@ -28,7 +28,7 @@ def zarr2np_climatology(path, variables, years, save_dir, partition, hrs_per_ste
             if len(zarr_ds[var].shape) == 3:  # surface level variables
                 yearly_data = zarr_ds.sel(time=str(year))[var].expand_dims("val", axis=1)
                 np_var = yearly_data.to_numpy()
-                np_var = np.transpose(np_var (0,1,3,2)) #transpose to T x 1 x H x W
+                np_var = np.transpose(np_var, (0,1,3,2)) #transpose to T x 1 x H x W
 
                 if var not in climatology:
                     climatology[var] = [leap_year_data_adjustment(np_var, hrs_per_step)]
@@ -46,9 +46,9 @@ def zarr2np_climatology(path, variables, years, save_dir, partition, hrs_per_ste
                     np_vars[f"{var}_{level}"] = np.transpose(np_vars[f"{var}_{level}"], (0,1,3,2)) #transpose to T x 1 x H x W
 
                     if f"{var}_{level}" not in climatology:
-                        climatology[f"{var}_{level}"] = [leap_year_data_adjustment(np_vars[f"{var}_{level}"])]
+                        climatology[f"{var}_{level}"] = [leap_year_data_adjustment(np_vars[f"{var}_{level}"], hrs_per_step)]
                     else:
-                        climatology[f"{var}_{level}"].append(leap_year_data_adjustment(np_vars[f"{var}_{level}"]))
+                        climatology[f"{var}_{level}"].append(leap_year_data_adjustment(np_vars[f"{var}_{level}"], hrs_per_step))
 
     for var in climatology.keys():
         climatology[var] = np.stack(climatology[var], axis=0)
