@@ -9,11 +9,11 @@ import numpy as np
 import xarray as xr
 from tqdm import tqdm
 
-from climax.utils.data_utils import DEFAULT_PRESSURE_LEVELS, HRS_PER_LEAP_YEAR, leap_year_data_adjustment, leap_year_time_adjustment
+from climax.utils.data_utils import DEFAULT_PRESSURE_LEVELS, HRS_PER_LEAP_YEAR, leap_year_data_adjustment, leap_year_time_adjustment, is_leap_year
 
 def zarr2np_climatology(path, variables, years, save_dir, partition, hrs_per_step):
     assert HRS_PER_LEAP_YEAR % hrs_per_step == 0
-    if not any(year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) for year in years):
+    if not any(is_leap_year(year) for year in years):
         print("WARNING: No leap year present in climatology years. This may result in issues when calculating ACC during evaluation as there will be no climatology for Feb 29th.")
     os.makedirs(os.path.join(save_dir, partition), exist_ok=True)
     zarr_ds = xr.open_zarr(path)
@@ -97,7 +97,7 @@ def zarr2np(path, variables, years, save_dir, partition, num_shards_per_year, gr
 
         # constant variables
         for f in constant_fields:
-            if (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0):
+            if is_leap_year(year):
                 np_vars[f] = constant_values[f]
             else:
                 np_vars[f] = constant_values[f][:(HRS_PER_LEAP_YEAR-24)//hrs_per_step]
@@ -149,7 +149,7 @@ def zarr2np(path, variables, years, save_dir, partition, num_shards_per_year, gr
         timestamps = [np.datetime_as_string(datetime, unit='m')[5:] for datetime in timestamps]
         np_vars['timestamps'] = np.array(timestamps)
 
-        if (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0):
+        if is_leap_year(year):
             assert np_vars['timestamps'].shape[0] == (HRS_PER_LEAP_YEAR // hrs_per_step)
             num_steps_per_shard = (HRS_PER_LEAP_YEAR // hrs_per_step) // num_shards_per_year
         else:

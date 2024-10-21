@@ -3,6 +3,7 @@
 
 import numpy as np
 import torch 
+import calendar
 
 NAME_TO_VAR = {
     "2m_temperature": "t2m",
@@ -158,3 +159,6 @@ def leap_year_time_adjustment(time, hrs_per_step):
         return adjusted_time
     else:
         return time
+
+def is_leap_year(year):
+    return calendar.isleap(year)
