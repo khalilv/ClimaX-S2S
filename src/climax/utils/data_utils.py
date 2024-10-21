@@ -88,6 +88,7 @@ BOUNDARIES = {
         'lon_range': (0, 360)
     }
 }
+HRS_PER_LEAP_YEAR = 8784
 
 def get_region_info(region, lat, lon, patch_size):
     region = BOUNDARIES[region]
@@ -138,3 +139,22 @@ def collate_fn(batch):
         [v for v in out_variables],
         output_timestamps
     )
+
+def leap_year_data_adjustment(data, hrs_per_step):
+    leap_year_steps = HRS_PER_LEAP_YEAR // hrs_per_step
+    if data.shape[0] < leap_year_steps:
+        feb29_start = 59 * 24//hrs_per_step #feb 29th would be the 59th day in a leap year
+        data_with_nan = np.insert(data, [feb29_start]*(24//hrs_per_step), np.nan, axis=0)
+        return data_with_nan
+    else:
+        return data
+
+def leap_year_time_adjustment(time, hrs_per_step):
+    leap_year_steps = HRS_PER_LEAP_YEAR // hrs_per_step
+    if time.shape[0] < leap_year_steps:
+        feb29_start = 59 * 24//hrs_per_step #feb 29th would be the 59th day in a leap year
+        feb29_vals = [f'02-29T{hh:02d}:00' for hh in range(0, 24, hrs_per_step)]
+        adjusted_time = np.insert(time, feb29_start, feb29_vals, axis=0)
+        return adjusted_time
+    else:
+        return time
