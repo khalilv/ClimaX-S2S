@@ -207,6 +207,7 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year, hrs_
 @click.option("--end_year", type=int, default=2019)
 @click.option("--num_shards", type=int, default=8)
 @click.option("--hrs_per_step", type=int, default=1)
+@click.option("--clim_start_year", type=int, default=1990)
 def main(
     root_dir,
     save_dir,
@@ -216,7 +217,8 @@ def main(
     start_test_year,
     end_year,
     num_shards,
-    hrs_per_step
+    hrs_per_step,
+    clim_start_year
 ):
     assert start_val_year > start_train_year and start_test_year > start_val_year and end_year > start_test_year
     train_years = range(start_train_year, start_val_year)
@@ -229,8 +231,8 @@ def main(
     nc2np(root_dir, variables, val_years, save_dir, "val", num_shards, hrs_per_step)
     nc2np(root_dir, variables, test_years, save_dir, "test", num_shards, hrs_per_step)
 
-    climatology_val_years = range(1990, start_val_year)
-    climatology_test_years = range(1990, start_test_year)
+    climatology_val_years = range(clim_start_year, start_val_year)
+    climatology_test_years = range(clim_start_year, start_test_year)
     nc2np_climatology(root_dir, variables, climatology_val_years, save_dir, "val", hrs_per_step)
     nc2np_climatology(root_dir, variables, climatology_test_years, save_dir, "test", hrs_per_step)
 
