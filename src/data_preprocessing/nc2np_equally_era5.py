@@ -83,8 +83,8 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year, hrs_
             HRS_PER_LEAP_YEAR // hrs_per_step, axis=0
         )
         if partition == "train":
-            normalize_mean[f] = np.atleast_1d(constant_field.mean(axis=(0,1))).astype('float32')
-            normalize_std[f] = np.atleast_1d(constant_field.std(axis=(0,1))).astype('float32')
+            normalize_mean[f] = constant_field.mean(axis=(0,1))
+            normalize_std[f] = constant_field.std(axis=(0,1))
 
     for year in tqdm(years):
         np_vars = {}
@@ -172,8 +172,8 @@ def nc2np(path, variables, years, save_dir, partition, num_shards_per_year, hrs_
                 sum_w_var = np.sum((std[:,1] - 1) * (std[:,0]**2))
                 sum_group_var = np.sum((std[:,1]) * (mean[:,0] - agg_mean)**2)
                 agg_std = np.sqrt((sum_w_var  + sum_group_var)/(np.sum(std[:,1]) - 1))
-                normalize_mean[var] = np.atleast_1d(agg_mean).astype('float32')
-                normalize_std[var] = np.atleast_1d(agg_std).astype('float32')
+                normalize_mean[var] = agg_mean
+                normalize_std[var] = agg_std
 
         np.savez(os.path.join(save_dir, "normalize_mean.npz"), **normalize_mean)
         np.savez(os.path.join(save_dir, "normalize_std.npz"), **normalize_std)

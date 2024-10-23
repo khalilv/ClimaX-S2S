@@ -87,15 +87,9 @@ class GlobalForecastDataModule(LightningDataModule):
         
     def get_normalize(self, variables):
         normalize_mean = dict(np.load(os.path.join(self.root_dir, "normalize_mean.npz")))
-        mean = []
-        for var in variables:
-            if var != "total_precipitation":
-                mean.append(normalize_mean[var])
-            else:
-                mean.append(np.array([0.0]))
-        normalize_mean = np.concatenate(mean)
+        normalize_mean = np.array([normalize_mean[var] for var in variables])
         normalize_std = dict(np.load(os.path.join(self.root_dir, "normalize_std.npz")))
-        normalize_std = np.concatenate([normalize_std[var] for var in variables])
+        normalize_std = np.array([normalize_std[var] for var in variables])
         return transforms.Normalize(normalize_mean, normalize_std)
 
     def get_lat_lon(self):
