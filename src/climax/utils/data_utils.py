@@ -190,3 +190,29 @@ def plot_spatial_map(data, title=None, filename=None):
     plt.close()
 
     return
+
+def encode_timestamp(timestamp_str):
+    """
+    Encodes a timestamp string of the form 'MM-DDTHH:MM' into a unique number.
+    For example, '01-01T00:00' -> 1010000 (MMDDHHMM).
+    """
+    month = int(timestamp_str[0:2])
+    day = int(timestamp_str[3:5])
+    hour = int(timestamp_str[6:8])
+    minute = int(timestamp_str[9:11])
+    encoded = (month * 1000000) + (day * 10000) + (hour * 100) + minute
+    return encoded
+
+def decode_timestamp(encoded):
+    """
+    Decodes the unique number back into the timestamp string 'MM-DDTHH:MM'.
+    For example, 1010000 -> '01-01T00:00'.
+    """
+    minute = encoded % 100
+    encoded = encoded // 100
+    hour = encoded % 100
+    encoded = encoded // 100
+    day = encoded % 100
+    month = encoded // 100
+    return f"{month:02d}-{day:02d}T{hour:02d}:{minute:02d}"
+

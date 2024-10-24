@@ -2,11 +2,11 @@ seed_everything: 42
 
 # ---------------------------- TRAINER -------------------------------------------
 trainer:
-  default_root_dir: /glade/derecho/scratch/kvirji/ClimaX-S2S/exps/weatherbench2_metrics/t2m_14d_n_shards_1
+  default_root_dir: /glade/derecho/scratch/kvirji/ClimaX-S2S/exps/wb1/scratch/t2m_1d
 
   precision: 16
 
-  gpus: 1
+  gpus: 4
   num_nodes: 1
   accelerator: gpu
   strategy: ddp
@@ -71,7 +71,7 @@ model:
   max_epochs: 125000
   warmup_start_lr: 1e-8
   eta_min: 1e-8
-  pretrained_path: /glade/derecho/scratch/kvirji/ClimaX-S2S/pretrained_weights/5.625deg.ckpt
+  pretrained_path: ""
   img_size: [32, 64]
   patch_size: 2
   embed_dim: 1024
@@ -86,7 +86,7 @@ model:
 
 # ---------------------------- DATA -------------------------------------------
 data:
-  root_dir: /glade/derecho/scratch/kvirji/all_5.625deg_preprocessed_n_shards_1
+  root_dir: /glade/derecho/scratch/kvirji/all_5.625deg_preprocessed_n_shards_8
   in_variables: [
       "land_sea_mask",
       "orography",
@@ -139,8 +139,9 @@ data:
     ]
   out_variables: ["2m_temperature"]
   # predict_range (steps) * hrs_each_step = lead_time (hrs)
-  predict_range: 336
+  predict_range: 24
   hrs_each_step: 1
+  history_range: 1
   buffer_size: 10000
   batch_size: 32
   num_workers: 0

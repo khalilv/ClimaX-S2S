@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torchmetrics import Metric
 from torchmetrics.utilities.data import dim_zero_cat
+from climax.utils.data_utils import encode_timestamp, decode_timestamp
 
 class mse(Metric):
     def __init__(self, vars, transforms=None, suffix=None, **kwargs):
@@ -200,7 +201,7 @@ class lat_weighted_acc(Metric):
         super().__init__(**kwargs)
         self.add_state("preds", default=[], dist_reduce_fx="cat")
         self.add_state("targets", default=[], dist_reduce_fx="cat")
-        self.add_state("output_timestamps", default=[])
+        self.add_state("encoded_timestamps", default=[], dist_reduce_fx="cat")
         self.vars = vars
         self.lat = lat
         self.transforms = transforms
@@ -211,11 +212,15 @@ class lat_weighted_acc(Metric):
     def update(self, preds: torch.Tensor, targets: torch.Tensor, output_timestamps: list):
         self.preds.append(preds)
         self.targets.append(targets)
-        self.output_timestamps.append(output_timestamps)
+        encoded_timestamps = torch.tensor([encode_timestamp(ts) for ts in output_timestamps], device=preds.device)
+        self.encoded_timestamps.append(encoded_timestamps)
+    
 
     def compute(self):
         preds = dim_zero_cat(self.preds)
         targets = dim_zero_cat(self.targets)
+        encoded_timestamps = dim_zero_cat(self.encoded_timestamps)  
+        decoded_timestamps = [decode_timestamp(ts.item()) for ts in encoded_timestamps]
 
         if self.transforms is not None:
             preds = self.transforms(preds)
@@ -227,7 +232,7 @@ class lat_weighted_acc(Metric):
         w_lat = torch.from_numpy(w_lat).unsqueeze(0).unsqueeze(-1).to(dtype=targets.dtype, device=targets.device)  # (1, H, 1)
 
         clim_timestamp_to_index = {timestamp: idx for idx, timestamp in enumerate(self.clim_timestamps)}
-        clim_subset_indices = [clim_timestamp_to_index[timestamp] for timestamp in self.output_timestamps]
+        clim_subset_indices = [clim_timestamp_to_index[timestamp] for timestamp in decoded_timestamps]
         clim_subset = self.clim[clim_subset_indices]
         clim_subset = clim_subset.to(device=targets.device)
         preds = preds - clim_subset
@@ -252,7 +257,7 @@ class lat_weighted_acc_spatial_map(Metric):
         super().__init__(**kwargs)
         self.add_state("preds", default=[], dist_reduce_fx="cat")
         self.add_state("targets", default=[], dist_reduce_fx="cat")
-        self.add_state("output_timestamps", default=[])
+        self.add_state("encoded_timestamps", default=[], dist_reduce_fx="cat")
         self.vars = vars
         self.lat = lat
         self.transforms = transforms
@@ -263,11 +268,14 @@ class lat_weighted_acc_spatial_map(Metric):
     def update(self, preds: torch.Tensor, targets: torch.Tensor, output_timestamps: list):
         self.preds.append(preds)
         self.targets.append(targets)
-        self.output_timestamps.append(output_timestamps)
-
+        encoded_timestamps = torch.tensor([encode_timestamp(ts) for ts in output_timestamps], device=preds.device)
+        self.encoded_timestamps.append(encoded_timestamps)
+    
     def compute(self):
         preds = dim_zero_cat(self.preds)
         targets = dim_zero_cat(self.targets)
+        encoded_timestamps = dim_zero_cat(self.encoded_timestamps)  
+        decoded_timestamps = [decode_timestamp(ts.item()) for ts in encoded_timestamps]
 
         if self.transforms is not None:
             preds = self.transforms(preds)
@@ -279,7 +287,7 @@ class lat_weighted_acc_spatial_map(Metric):
         w_lat = torch.from_numpy(w_lat).unsqueeze(0).unsqueeze(-1).to(dtype=targets.dtype, device=targets.device)  # (1, H, 1)
 
         clim_timestamp_to_index = {timestamp: idx for idx, timestamp in enumerate(self.clim_timestamps)}
-        clim_subset_indices = [clim_timestamp_to_index[timestamp] for timestamp in self.output_timestamps]
+        clim_subset_indices = [clim_timestamp_to_index[timestamp] for timestamp in decoded_timestamps]
         clim_subset = self.clim[clim_subset_indices]
         clim_subset = clim_subset.to(device=targets.device)
         preds = preds - clim_subset

@@ -3,7 +3,7 @@
 
 # credits: https://github.com/ashleve/lightning-hydra-template/blob/main/src/models/mnist_module.py
 from typing import Any
-
+import numpy as np
 import torch
 from pytorch_lightning import LightningModule
 from torchvision.transforms import transforms
@@ -245,9 +245,9 @@ class GlobalForecastModule(LightningModule):
 
         #spatial maps
         for var in w_rmse_spatial_maps.keys():
-            plot_spatial_map(w_rmse_spatial_maps[var], title=var, filename=f"{self.logger.log_dir}/test_{var}.png")
+            plot_spatial_map(np.flipud(w_rmse_spatial_maps[var].cpu().numpy()), title=var, filename=f"{self.logger.log_dir}/test_{var}.png")
         for var in w_acc_spatial_maps.keys():
-            plot_spatial_map(w_acc_spatial_maps[var], title=var, filename=f"{self.logger.log_dir}/test_{var}.png")
+            plot_spatial_map(np.flipud(w_acc_spatial_maps[var].cpu().numpy()), title=var, filename=f"{self.logger.log_dir}/test_{var}.png")
 
         self.test_lat_weighted_mse.reset()
         self.test_lat_weighted_rmse.reset()
