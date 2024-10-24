@@ -4,6 +4,7 @@
 import numpy as np
 import torch 
 import calendar
+from matplotlib import pyplot as plt 
 
 NAME_TO_VAR = {
     "2m_temperature": "t2m",
@@ -164,3 +165,28 @@ def leap_year_time_adjustment(time, hrs_per_step):
 
 def is_leap_year(year):
     return calendar.isleap(year)
+
+def plot_spatial_map(data, title=None, filename=None):
+    """Plot a spatial map of 2D data with latitude and longitude axes.
+    
+    Args:
+        data (np.ndarray): 2D array of values to plot
+        title (str, optional): Title for the plot
+        filename (str, optional): Filename to save the plot as PNG
+    """    
+    plt.figure(figsize=(10, 6))
+    plt.imshow(data, cmap='viridis')
+    plt.colorbar()
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    plt.xticks([])
+    plt.yticks([])
+    if title is not None:
+        plt.title(title)
+    plt.tight_layout()
+    
+    if filename is not None:
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    return

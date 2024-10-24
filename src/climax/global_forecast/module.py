@@ -14,9 +14,11 @@ from climax.utils.metrics import (
     lat_weighted_acc,
     lat_weighted_mse,
     lat_weighted_rmse,
+    lat_weighted_acc_spatial_map,
+    lat_weighted_rmse_spatial_map
 )
 from climax.utils.pos_embed import interpolate_pos_embed
-
+from climax.utils.data_utils import plot_spatial_map
 #3) Global forecast module - abstraction for training/validation/testing steps. setup for the module including hyperparameters is included here
 
 class GlobalForecastModule(LightningModule):
@@ -115,9 +117,11 @@ class GlobalForecastModule(LightningModule):
         self.val_lat_weighted_mse = lat_weighted_mse(self.out_variables, self.lat, self.denormalization)
         self.val_lat_weighted_rmse = lat_weighted_rmse(self.out_variables, self.lat, self.denormalization)
         self.val_lat_weighted_acc = lat_weighted_acc(self.out_variables, self.lat, self.val_clim, self.val_clim_timestamps, self.denormalization)
-        self.test_lat_weighted_mse = lat_weighted_mse(self.out_variables, self.lat, self.denormalization)
+        self.test_lat_weighted_mse = lat_weighted_mse(self.out_variables, self.lat, self.denormalization)        
+        self.test_lat_weighted_rmse_spatial_map = lat_weighted_rmse_spatial_map(self.out_variables, self.lat, self.denormalization)
         self.test_lat_weighted_rmse = lat_weighted_rmse(self.out_variables, self.lat, self.denormalization)
         self.test_lat_weighted_acc = lat_weighted_acc(self.out_variables, self.lat, self.test_clim, self.test_clim_timestamps, self.denormalization)
+        self.test_lat_weighted_acc_spatial_map = lat_weighted_acc_spatial_map(self.out_variables, self.lat, self.test_clim, self.test_clim_timestamps, self.denormalization)
 
     def init_network(self, in_vars: list):
         self.net = ClimaX(in_vars=self.in_variables, 
@@ -192,8 +196,9 @@ class GlobalForecastModule(LightningModule):
         w_mse = self.val_lat_weighted_mse.compute()
         w_rmse = self.val_lat_weighted_rmse.compute()
         w_acc = self.val_lat_weighted_acc.compute()
+       
+        #scalar metrics
         loss_dict = {**w_mse, **w_rmse, **w_acc}
-
         for var in loss_dict.keys():
             self.log(
                 "val/" + var,
@@ -217,14 +222,19 @@ class GlobalForecastModule(LightningModule):
         y = y.float()
         self.test_lat_weighted_mse.update(preds, y)
         self.test_lat_weighted_rmse.update(preds, y)
+        self.test_lat_weighted_rmse_spatial_map.update(preds, y)
         self.test_lat_weighted_acc.update(preds, y, output_timestamps)
+        self.test_lat_weighted_acc_spatial_map.update(preds, y, output_timestamps)
 
     def on_test_epoch_end(self):
         w_mse = self.test_lat_weighted_mse.compute()
         w_rmse = self.test_lat_weighted_rmse.compute()
         w_acc = self.test_lat_weighted_acc.compute()
-        loss_dict = {**w_mse, **w_rmse, **w_acc}
+        w_rmse_spatial_maps = self.test_lat_weighted_rmse_spatial_map.compute()
+        w_acc_spatial_maps = self.test_lat_weighted_acc_spatial_map.compute()
 
+        #scalar metrics
+        loss_dict = {**w_mse, **w_rmse, **w_acc}
         for var in loss_dict.keys():
             self.log(
                 "test/" + var,
@@ -232,10 +242,19 @@ class GlobalForecastModule(LightningModule):
                 prog_bar=False,
                 sync_dist=True
             )
+
+        #spatial maps
+        for var in w_rmse_spatial_maps.keys():
+            plot_spatial_map(w_rmse_spatial_maps[var], title=var, filename=f"{self.logger.log_dir}/test_{var}.png")
+        for var in w_acc_spatial_maps.keys():
+            plot_spatial_map(w_acc_spatial_maps[var], title=var, filename=f"{self.logger.log_dir}/test_{var}.png")
+
         self.test_lat_weighted_mse.reset()
         self.test_lat_weighted_rmse.reset()
         self.test_lat_weighted_acc.reset()
-    
+        self.test_lat_weighted_acc_spatial_map.reset()
+        self.test_lat_weighted_rmse_spatial_map.reset()
+
     #optimizer definition - will be used to optimize the network based
     def configure_optimizers(self):
         decay = []

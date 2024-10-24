@@ -154,6 +154,46 @@ class lat_weighted_rmse(Metric):
         
         return loss_dict
 
+class lat_weighted_rmse_spatial_map(Metric):
+    def __init__(self, vars, lat, transforms=None, suffix=None, **kwargs):
+        super().__init__(**kwargs)
+        self.add_state("preds", default=[], dist_reduce_fx="cat")
+        self.add_state("targets", default=[], dist_reduce_fx="cat")
+        self.vars = vars
+        self.lat = lat
+        self.transforms = transforms
+        self.suffix = suffix
+
+    def update(self, preds: torch.Tensor, targets: torch.Tensor):
+        self.preds.append(preds)
+        self.targets.append(targets)
+
+    def compute(self):
+        preds = dim_zero_cat(self.preds)
+        targets = dim_zero_cat(self.targets)
+
+        if self.transforms is not None:
+            preds = self.transforms(preds)
+            targets = self.transforms(targets) 
+
+        error = (preds - targets) ** 2  # [T, V, H, W]
+
+        # lattitude weights
+        w_lat = np.cos(np.deg2rad(self.lat))
+        w_lat = w_lat / w_lat.mean()  # (H, )
+        w_lat = torch.from_numpy(w_lat).unsqueeze(0).unsqueeze(-1).to(dtype=error.dtype, device=error.device)  # (1, H, 1)
+
+        spatial_map_dict = {}
+
+        for i, var in enumerate(self.vars):
+            spatial_map_name = f"w_rmse_spatial_map_{var}_{self.suffix}" if self.suffix else f"w_rmse_spatial_map_{var}"
+            spatial_map_dict[spatial_map_name] = torch.sqrt((error[:, i] * w_lat).mean(dim=(0)))
+
+        spatial_map_name = f"w_rmse_{self.suffix}" if self.suffix else f"w_rmse"
+        spatial_map_dict[spatial_map_name] = torch.mean(torch.stack(list(spatial_map_dict.values())), dim=(0))
+        
+        return spatial_map_dict
+
 
 class lat_weighted_acc(Metric):
     def __init__(self, vars, lat, clim, clim_timestamps, transforms=None, suffix=None, **kwargs):
@@ -206,3 +246,55 @@ class lat_weighted_acc(Metric):
         loss_dict[loss_name] = torch.mean(torch.stack(list(loss_dict.values())))
         
         return loss_dict
+    
+class lat_weighted_acc_spatial_map(Metric):
+    def __init__(self, vars, lat, clim, clim_timestamps, transforms=None, suffix=None, **kwargs):
+        super().__init__(**kwargs)
+        self.add_state("preds", default=[], dist_reduce_fx="cat")
+        self.add_state("targets", default=[], dist_reduce_fx="cat")
+        self.add_state("output_timestamps", default=[])
+        self.vars = vars
+        self.lat = lat
+        self.transforms = transforms
+        self.suffix = suffix
+        self.clim = clim
+        self.clim_timestamps = clim_timestamps
+
+    def update(self, preds: torch.Tensor, targets: torch.Tensor, output_timestamps: list):
+        self.preds.append(preds)
+        self.targets.append(targets)
+        self.output_timestamps.append(output_timestamps)
+
+    def compute(self):
+        preds = dim_zero_cat(self.preds)
+        targets = dim_zero_cat(self.targets)
+
+        if self.transforms is not None:
+            preds = self.transforms(preds)
+            targets = self.transforms(targets) 
+
+        # lattitude weights
+        w_lat = np.cos(np.deg2rad(self.lat))
+        w_lat = w_lat / w_lat.mean()  # (H, )
+        w_lat = torch.from_numpy(w_lat).unsqueeze(0).unsqueeze(-1).to(dtype=targets.dtype, device=targets.device)  # (1, H, 1)
+
+        clim_timestamp_to_index = {timestamp: idx for idx, timestamp in enumerate(self.clim_timestamps)}
+        clim_subset_indices = [clim_timestamp_to_index[timestamp] for timestamp in self.output_timestamps]
+        clim_subset = self.clim[clim_subset_indices]
+        clim_subset = clim_subset.to(device=targets.device)
+        preds = preds - clim_subset
+        targets = targets - clim_subset
+        spatial_map_dict = {}
+
+        for i, var in enumerate(self.vars):
+            pred_prime = preds[:, i]
+            targ_prime = targets[:, i]
+            acc_spatial_map = torch.sum((w_lat * pred_prime * targ_prime), dim=(0)) / torch.sqrt(
+                torch.sum((w_lat * pred_prime**2), dim=(0)) * torch.sum((w_lat * targ_prime**2), dim=(0)))
+            spatial_map_name = f"w_acc_spatial_{var}_{self.suffix}" if self.suffix else f"w_acc_spatial_{var}"
+            spatial_map_dict[spatial_map_name] = acc_spatial_map
+
+        spatial_map_name = f"w_acc_spatial_{self.suffix}" if self.suffix else f"w_acc"
+        spatial_map_dict[spatial_map_name] = torch.mean(torch.stack(list(spatial_map_dict.values())), dim=(0))
+        
+        return spatial_map_dict
