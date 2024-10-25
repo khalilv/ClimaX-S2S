@@ -166,8 +166,11 @@ class GlobalForecastModule(LightningModule):
         x = x.squeeze() #squeeze history dimension
    
         preds = self.net.forward(x, lead_times, variables, out_variables)
-        preds = preds.to(self.device).float()
-        y = y.to(self.device).float()
+        
+        #cast to float
+        preds = preds.float()
+        y = y.float()
+        
         batch_loss = self.train_lat_weighted_mse(preds, y)
         for var in batch_loss.keys():
             self.log(
@@ -186,8 +189,11 @@ class GlobalForecastModule(LightningModule):
         x = x.squeeze() #squeeze history dimension
 
         preds = self.net.forward(x, lead_times, variables, out_variables)
+        
+        #cast to float
         preds = preds.float()
         y = y.float()
+
         self.val_lat_weighted_mse.update(preds, y)
         self.val_lat_weighted_rmse.update(preds, y)
         self.val_lat_weighted_acc.update(preds, y, output_timestamps)
@@ -218,8 +224,11 @@ class GlobalForecastModule(LightningModule):
         x = x.squeeze() #squeeze history dimension
 
         preds = self.net.forward(x, lead_times, variables, out_variables)
+
+        #cast to float
         preds = preds.float()
         y = y.float()
+        
         self.test_lat_weighted_mse.update(preds, y)
         self.test_lat_weighted_rmse.update(preds, y)
         self.test_lat_weighted_rmse_spatial_map.update(preds, y)

@@ -15,9 +15,8 @@ def main():
         model_class=GlobalForecastModule,
         datamodule_class=GlobalForecastDataModule,
         seed_everything_default=42,
-        save_config_overwrite=True,
+        save_config_kwargs={"overwrite": True},
         run=False,
-        auto_registry=True,
         parser_kwargs={"parser_mode": "omegaconf", "error_handler": None},
     )
     os.makedirs(cli.trainer.default_root_dir, exist_ok=True)
